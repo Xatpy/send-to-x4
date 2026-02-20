@@ -43,6 +43,8 @@ export function extractArticle() {
         };
 
         const getStructuredContentRoot = () => {
+            // Prefer structured content roots (including Substack-like markup)
+            // when Readability strips section headings from parsed output.
             const selectors = [
                 '.available-content .body.markup',
                 '.single-post-container .available-content',
