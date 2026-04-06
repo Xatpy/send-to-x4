@@ -65,6 +65,90 @@ browserAPI.runtime.onMessage.addListener((message, sender, sendResponse) => {
 });
 
 /**
+ * External API bridge for trusted websites (e.g. Antoine's Archive).
+ * Minimal surface:
+ * - x4.ping
+ * - x4.status ({ firmwareType, host })
+ * - x4.upload ({ firmwareType, host, filename, dataBase64 })
+ */
+browserAPI.runtime.onMessageExternal.addListener((message, _sender, sendResponse) => {
+    if (!message || message.type !== 'X4_EXTERNAL_API') return;
+
+    (async () => {
+        try {
+            let data;
+            switch (message.action) {
+                case 'x4.ping':
+                    data = { ok: true };
+                    break;
+                case 'x4.status':
+                    data = await handleExternalStatus(message.payload || {});
+                    break;
+                case 'x4.upload':
+                    data = await handleExternalUpload(message.payload || {});
+                    break;
+                default:
+                    throw new Error(`Unsupported action: ${String(message.action)}`);
+            }
+            sendResponse({ ok: true, data });
+        } catch (error) {
+            sendResponse({ ok: false, error: error instanceof Error ? error.message : 'External API error' });
+        }
+    })();
+
+    return true;
+});
+
+function decodeBase64ToArrayBuffer(base64) {
+    const binary = atob(base64);
+    const bytes = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i += 1) bytes[i] = binary.charCodeAt(i);
+    return bytes.buffer;
+}
+
+async function handleExternalStatus(payload) {
+    const firmwareType = payload?.firmwareType === 'stock' ? 'stock' : 'crosspoint';
+    const host = (payload?.host || (firmwareType === 'crosspoint' ? '192.168.4.1' : '192.168.3.3')).trim();
+    const base = host.includes('://') ? host.replace(/\/+$/, '') : `http://${host.replace(/\/+$/, '')}`;
+
+    if (firmwareType === 'crosspoint') {
+        const response = await fetch(`${base}/api/status`, { method: 'GET' });
+        if (!response.ok) return { connected: false, error: `Status ${response.status}` };
+        const data = await response.json().catch(() => ({}));
+        return {
+            connected: true,
+            version: data?.version,
+            ip: data?.ip,
+            mode: data?.mode,
+        };
+    }
+
+    const response = await fetch(`${base}/list?dir=/`, { method: 'GET' });
+    if (!response.ok) return { connected: false, error: `Status ${response.status}` };
+    return { connected: true };
+}
+
+async function handleExternalUpload(payload) {
+    const firmwareType = payload?.firmwareType === 'stock' ? 'stock' : 'crosspoint';
+    const host = (payload?.host || (firmwareType === 'crosspoint' ? '192.168.4.1' : '192.168.3.3')).trim();
+    const filename = (payload?.filename || 'book.epub').trim() || 'book.epub';
+    const dataBase64 = payload?.dataBase64;
+    if (!dataBase64 || typeof dataBase64 !== 'string') {
+        return { success: false, error: 'Missing dataBase64' };
+    }
+
+    const arrayBuffer = decodeBase64ToArrayBuffer(dataBase64);
+
+    if (firmwareType === 'crosspoint') {
+        CrossPointUpload.setIp(host.replace(/^https?:\/\//i, ''));
+        return await CrossPointUpload.uploadEpub(arrayBuffer, filename);
+    }
+
+    X4UploadTab.setIp(host.replace(/^https?:\/\//i, ''));
+    return await X4UploadTab.uploadEpub(arrayBuffer, filename);
+}
+
+/**
  * Handle fetch proxy (to bypass CORS/Mixed Content in popup)
  */
 async function handleFetch(payload) {

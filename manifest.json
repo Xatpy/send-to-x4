@@ -17,6 +17,13 @@
     "http://192.168.1.224/*",
     "<all_urls>"
   ],
+  "externally_connectable": {
+    "matches": [
+      "https://send-to-reader.antoinevidal.fr/*",
+      "https://send-to-reader.vercel.app/*",
+      "http://localhost:5193/*"
+    ]
+  },
   "background": {
     "service_worker": "src/background/service_worker.js",
     "scripts": [
