@@ -292,56 +292,75 @@ async function handleSendArticle(messageData, sender, sendResponse) {
 }
 
 /**
- * Download EPUB as fallback
- * Chrome MV3 service workers: Use data URL (can't use createObjectURL)
- * Firefox MV3 service workers: Use Blob URL (data URLs blocked for security)
+ * Download EPUB as fallback.
+ *
+ * Chromium MV3 runs this file as a service worker, where URL.createObjectURL()
+ * is unavailable, so use a data URL there. Firefox runs this file as a
+ * background script from manifest.background.scripts, where object URLs are
+ * available and avoid Firefox data URL download restrictions.
  */
+const EPUB_MIME_TYPE = 'application/epub+zip';
+
+function canUseObjectUrl() {
+    return typeof Blob !== 'undefined' &&
+        typeof URL !== 'undefined' &&
+        typeof URL.createObjectURL === 'function';
+}
+
+function arrayBufferToDataUrl(arrayBuffer, mimeType) {
+    const bytes = new Uint8Array(arrayBuffer);
+    const chunkSize = 0x8000;
+    let binary = '';
+
+    for (let i = 0; i < bytes.length; i += chunkSize) {
+        const chunk = bytes.subarray(i, i + chunkSize);
+        binary += String.fromCharCode.apply(null, chunk);
+    }
+
+    return `data:${mimeType};base64,${btoa(binary)}`;
+}
+
 async function downloadEpubFallback(arrayBuffer, filename) {
     try {
         console.log('[X4 SW] Triggering download fallback...');
 
-        // Detect if we're in Firefox (has 'browser' namespace) or Chrome
-        const isFirefox = typeof browser !== 'undefined' && typeof browser.runtime !== 'undefined';
-        console.log('[X4 SW] Browser detected:', isFirefox ? 'Firefox' : 'Chrome');
-
         let downloadUrl;
+        let objectUrlToRevoke = null;
 
-        if (isFirefox) {
-            // Firefox: Use Blob URL (works in MV3 service workers)
-            console.log('[X4 SW] Using Blob URL for Firefox...');
-            const blob = new Blob([arrayBuffer], { type: 'application/epub+zip' });
+        if (canUseObjectUrl()) {
+            console.log('[X4 SW] Using Blob object URL download fallback...');
+            const blob = new Blob([arrayBuffer], { type: EPUB_MIME_TYPE });
             downloadUrl = URL.createObjectURL(blob);
-            console.log('[X4 SW] Blob URL created:', downloadUrl);
+            objectUrlToRevoke = downloadUrl;
         } else {
-            // Chrome: Use data URL (works in service workers)
-            console.log('[X4 SW] Converting to data URL for Chrome...');
-            const bytes = new Uint8Array(arrayBuffer);
-            let binary = '';
-            for (let i = 0; i < bytes.length; i++) {
-                binary += String.fromCharCode(bytes[i]);
-            }
-            const base64 = btoa(binary);
-            downloadUrl = `data:application/epub+zip;base64,${base64}`;
+            console.log('[X4 SW] Using data URL download fallback...');
+            downloadUrl = arrayBufferToDataUrl(arrayBuffer, EPUB_MIME_TYPE);
             console.log('[X4 SW] Data URL length:', downloadUrl.length);
         }
 
         // Trigger download
         console.log('[X4 SW] Calling browserAPI.downloads.download...');
-        const downloadId = await browserAPI.downloads.download({
-            url: downloadUrl,
-            filename: filename,
-            saveAs: false
-        });
+        let downloadId;
+        try {
+            downloadId = await browserAPI.downloads.download({
+                url: downloadUrl,
+                filename: filename,
+                saveAs: false
+            });
+        } catch (error) {
+            if (objectUrlToRevoke) {
+                URL.revokeObjectURL(objectUrlToRevoke);
+            }
+            throw error;
+        }
 
         console.log('[X4 SW] Download triggered successfully, ID:', downloadId);
 
-        // Clean up Blob URL after download starts (Firefox only)
-        if (isFirefox) {
-            // Give the download a moment to start before revoking
+        if (objectUrlToRevoke) {
             setTimeout(() => {
-                URL.revokeObjectURL(downloadUrl);
-                console.log('[X4 SW] Blob URL revoked');
-            }, 1000);
+                URL.revokeObjectURL(objectUrlToRevoke);
+                console.log('[X4 SW] Blob object URL revoked');
+            }, 60000);
         }
     } catch (error) {
         console.error('[X4 SW] Download failed:', error);
