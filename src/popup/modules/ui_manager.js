@@ -136,7 +136,11 @@ export class UIManager {
     setDeviceRefreshState(refreshing) {
         const btn = this.elements.deviceRefreshBtn;
         btn.disabled = refreshing;
-        btn.innerHTML = refreshing ? '<span class="btn-spinner"></span>' : '↻';
+        if (refreshing) {
+            this.setSpinner(btn, 'span');
+        } else {
+            btn.textContent = '↻';
+        }
     }
 
     showFileList(files, onDelete, errorMessage = null) {
@@ -167,7 +171,13 @@ export class UIManager {
     showEmptyFileList() {
         this.elements.deviceFiles.classList.remove('hidden');
         this.elements.fileCount.textContent = '0 files';
-        this.elements.fileListItems.innerHTML = '<li class="empty"><span class="file-name">No files yet</span></li>';
+        const item = document.createElement('li');
+        item.className = 'empty';
+        const message = document.createElement('span');
+        message.className = 'file-name';
+        message.textContent = 'No files yet';
+        item.append(message);
+        this.elements.fileListItems.replaceChildren(item);
     }
 
     showQueue(items, handlers = {}) {
@@ -238,7 +248,7 @@ export class UIManager {
         switch (state) {
             case 'loading':
                 btn.disabled = true;
-                iconSpan.innerHTML = '<div class="btn-spinner"></div>';
+                this.setSpinner(iconSpan);
                 break;
             case 'success':
                 btn.disabled = false;
@@ -270,7 +280,7 @@ export class UIManager {
             case 'sending':
                 this.sendInProgress = true;
                 btn.disabled = true;
-                iconSpan.innerHTML = '<div class="btn-spinner"></div>';
+                this.setSpinner(iconSpan);
                 textSpan.textContent = 'Sending...';
                 break;
 
@@ -309,7 +319,7 @@ export class UIManager {
         switch (state) {
             case 'downloading':
                 btn.disabled = true;
-                iconSpan.innerHTML = '<div class="btn-spinner"></div>';
+                this.setSpinner(iconSpan);
                 textSpan.textContent = '...';
                 break;
 
@@ -333,5 +343,11 @@ export class UIManager {
                 textSpan.textContent = 'Download';
                 break;
         }
+    }
+
+    setSpinner(container, tagName = 'div') {
+        const spinner = document.createElement(tagName);
+        spinner.className = 'btn-spinner';
+        container.replaceChildren(spinner);
     }
 }
