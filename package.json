@@ -2,6 +2,8 @@
   "name": "send-to-x4",
   "private": true,
   "scripts": {
-    "test": "node --test tests/*.test.js"
+    "test": "node --test tests/*.test.js",
+    "build:chrome": "node scripts/build-store-package.js chrome",
+    "build:firefox": "node scripts/build-store-package.js firefox"
   }
 }
