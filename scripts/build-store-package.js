@@ -33,6 +33,13 @@ if (target === 'firefox') {
             'src/background/service_worker.js'
         ]
     };
+    // AMO requires a data-collection declaration for new add-ons. Support for
+    // it starts in Firefox 140 (desktop) and 142 (Android), so don't claim
+    // compatibility with versions that cannot interpret the declaration.
+    manifest.browser_specific_settings.gecko.strict_min_version = '140.0';
+    manifest.browser_specific_settings.gecko_android = {
+        strict_min_version: '142.0'
+    };
 }
 
 rmSync(staging, { recursive: true, force: true });

@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Send to X4",
-  "version": "1.2.3",
+  "version": "1.2.4",
   "author": "Xatpy",
   "description": "Send articles from any website to Xteink X4 e-ink reader as EPUB",
   "permissions": [

@@ -16,9 +16,9 @@ const Sanitizer = {
             return this.basicCleanup(html);
         }
 
-        // Create a temporary container
-        const temp = document.createElement('div');
-        temp.innerHTML = html;
+        // Parse untrusted markup in a detached document before filtering it.
+        // This avoids executing it in the popup/content-script document.
+        const temp = new DOMParser().parseFromString(html, 'text/html').body;
 
         // Remove dangerous elements
         const dangerousTags = ['script', 'style', 'iframe', 'object', 'embed', 'form', 'input', 'button', 'svg', 'math'];
@@ -42,7 +42,7 @@ const Sanitizer = {
             // Convert links to text (remove href)
             if (el.tagName === 'A') {
                 const text = el.textContent;
-                el.replaceWith(document.createTextNode(text));
+                el.replaceWith(temp.ownerDocument.createTextNode(text));
             }
         });
 
