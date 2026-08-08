@@ -37,7 +37,7 @@ export class ArticleManager {
                 // However, executeScript files: [] runs immediately.
                 await browserAPI.scripting.executeScript({
                     target: { tabId: tab.id },
-                    files: ['src/content/readability.min.js']
+                    files: ['src/content/extraction_helpers.js', 'src/content/readability.min.js']
                 });
                 console.log('[Article Manager] Readability injected');
             } catch (injectError) {

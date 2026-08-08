@@ -7,6 +7,61 @@ export function extractArticle() {
     try {
         console.log('[X4] Extracting article...');
         const hostname = window.location.hostname;
+        const extractionHelpers = window.X4ExtractionHelpers || {
+            countHeadingTags(html, minLevel = 2, maxLevel = 3) {
+                if (!html || minLevel > maxLevel) return 0;
+                let total = 0;
+                for (let level = minLevel; level <= maxLevel; level++) {
+                    const re = new RegExp(`<h${level}\\b`, 'gi');
+                    total += (html.match(re) || []).length;
+                }
+                return total;
+            },
+            sanitizeHeadingClasses(rootNode) {
+                if (!rootNode || typeof rootNode.querySelectorAll !== 'function') {
+                    return 0;
+                }
+                const classTokenRe = /(^|[-_])(header|anchor)([-_]|$)/i;
+                let removedCount = 0;
+                rootNode.querySelectorAll('h1,h2,h3,h4,h5,h6').forEach((heading) => {
+                    if (!heading || typeof heading.className !== 'string' || !heading.className) {
+                        return;
+                    }
+                    const classes = heading.className.split(/\s+/).filter(Boolean);
+                    if (classes.length === 0) return;
+                    const kept = classes.filter((token) => !classTokenRe.test(token));
+                    removedCount += classes.length - kept.length;
+                    if (kept.length !== classes.length) {
+                        heading.className = kept.join(' ');
+                    }
+                });
+                return removedCount;
+            },
+            shouldUseHeadingFallback(sourceHtml, parsedHtml) {
+                return this.countHeadingTags(sourceHtml) > 0 && this.countHeadingTags(parsedHtml) === 0;
+            }
+        };
+
+        const getStructuredContentRoot = () => {
+            // Prefer structured content roots (including Substack-like markup)
+            // when Readability strips section headings from parsed output.
+            const selectors = [
+                '.available-content .body.markup',
+                '.single-post-container .available-content',
+                'article .body.markup',
+                'article .markup',
+                'article'
+            ];
+
+            for (const selector of selectors) {
+                const el = document.querySelector(selector);
+                if (el && (el.innerHTML || '').trim().length > 0) {
+                    return el;
+                }
+            }
+
+            return null;
+        };
 
         // --- TWITTER / X SUPPORT ---
         if (hostname.includes('twitter.com') || hostname.includes('x.com')) {
@@ -178,6 +233,7 @@ export function extractArticle() {
         if (hasReadability) {
             // Use Readability
             const docClone = document.cloneNode(true);
+            extractionHelpers.sanitizeHeadingClasses(docClone);
             const reader = new Readability(docClone);
             const article = reader.parse();
 
@@ -187,6 +243,17 @@ export function extractArticle() {
                 body = article.content;
                 textContent = article.textContent;
                 wordCount = textContent.split(/\s+/).length;
+
+                const structuredRoot = getStructuredContentRoot();
+                if (structuredRoot) {
+                    const sourceHtml = structuredRoot.innerHTML || '';
+                    if (extractionHelpers.shouldUseHeadingFallback(sourceHtml, body)) {
+                        console.log('[X4] Readability dropped headings; using structured source body fallback');
+                        body = sourceHtml;
+                        textContent = structuredRoot.innerText || structuredRoot.textContent || textContent;
+                        wordCount = textContent.split(/\s+/).filter(Boolean).length;
+                    }
+                }
 
                 // Try to get date
                 const dateEl = document.querySelector('meta[property="article:published_time"]') ||
