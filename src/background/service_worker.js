@@ -348,20 +348,33 @@ function readQueuedItem(id) {
 }
 
 /**
- * Download EPUB as a base64 data URL. Service workers cannot create object
- * URLs, so this path works consistently in Chrome and Firefox.
+ * Download an EPUB without routing it through a page.
+ *
+ * Chrome MV3 service workers cannot reliably create object URLs, while Firefox
+ * rejects `data:` URLs passed to downloads.download. Use the format supported
+ * by each browser instead.
  */
 async function downloadEpubFallback(arrayBuffer, filename) {
     try {
         console.log('[X4 SW] Triggering download fallback...');
-        const bytes = new Uint8Array(arrayBuffer);
-        let binary = '';
-        for (let i = 0; i < bytes.length; i++) {
-            binary += String.fromCharCode(bytes[i]);
+        const isFirefox = typeof browser !== 'undefined' &&
+            typeof browser.runtime?.getBrowserInfo === 'function';
+
+        let downloadUrl;
+        if (isFirefox) {
+            const epubBlob = new Blob([arrayBuffer], { type: 'application/epub+zip' });
+            downloadUrl = URL.createObjectURL(epubBlob);
+            console.log('[X4 SW] Using Blob URL for Firefox download.');
+        } else {
+            const bytes = new Uint8Array(arrayBuffer);
+            let binary = '';
+            for (let i = 0; i < bytes.length; i++) {
+                binary += String.fromCharCode(bytes[i]);
+            }
+            const base64 = btoa(binary);
+            downloadUrl = `data:application/epub+zip;base64,${base64}`;
+            console.log('[X4 SW] Using data URL for Chromium download.');
         }
-        const base64 = btoa(binary);
-        const downloadUrl = `data:application/epub+zip;base64,${base64}`;
-        console.log('[X4 SW] Data URL length:', downloadUrl.length);
 
         // Trigger download
         console.log('[X4 SW] Calling browserAPI.downloads.download...');
@@ -372,6 +385,12 @@ async function downloadEpubFallback(arrayBuffer, filename) {
         });
 
         console.log('[X4 SW] Download triggered successfully, ID:', downloadId);
+
+        if (isFirefox) {
+            // The downloads API has consumed the object URL once its promise
+            // resolves. Revoke it on the next task to avoid retaining EPUB data.
+            setTimeout(() => URL.revokeObjectURL(downloadUrl), 0);
+        }
     } catch (error) {
         console.error('[X4 SW] Download failed:', error);
         throw error;
