@@ -63,12 +63,14 @@ const EpubBuilder = {
         }
         */
 
+        const preparedContent = EpubTemplates.prepareHeadings(article.body);
         const metadata = {
             title: article.title,
             author: article.author,
             date: article.date,
             uuid: uuid,
-            coverMediaType
+            coverMediaType,
+            headings: preparedContent.headings
         };
 
         // Add mimetype file (must be first and uncompressed)
@@ -84,7 +86,10 @@ const EpubBuilder = {
         zip.file('OEBPS/toc.ncx', EpubTemplates.tocNcx(metadata));
 
         // Add content.xhtml (pass full article including url)
-        zip.file('OEBPS/content.xhtml', EpubTemplates.contentXhtml(article));
+        zip.file('OEBPS/content.xhtml', EpubTemplates.contentXhtml({
+            ...article,
+            body: preparedContent.body
+        }));
 
         // Generate the EPUB as a Blob
         const epubBlob = await zip.generateAsync({
