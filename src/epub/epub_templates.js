@@ -66,7 +66,15 @@ ${coverItem}
    * @param {Object} metadata - { title, uuid }
    */
   tocNcx(metadata) {
-    const { title, uuid } = metadata;
+    const { title, uuid, headings = [] } = metadata;
+    const sectionNavPoints = headings.map((heading, index) => `
+    <navPoint id="navpoint-${index + 2}" playOrder="${index + 2}">
+      <navLabel>
+        <text>${this.escapeXml(heading.title)}</text>
+      </navLabel>
+      <content src="content.xhtml#${this.escapeXml(heading.id)}"/>
+    </navPoint>`).join('');
+
     return `<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE ncx PUBLIC "-//NISO//DTD ncx 2005-1//EN" "http://www.daisy.org/z3986/2005/ncx-2005-1.dtd">
 <ncx xmlns="http://www.daisy.org/z3986/2005/ncx/" version="2005-1">
@@ -85,9 +93,53 @@ ${coverItem}
         <text>${this.escapeXml(title)}</text>
       </navLabel>
       <content src="content.xhtml"/>
-    </navPoint>
+    </navPoint>${sectionNavPoints}
   </navMap>
 </ncx>`;
+  },
+
+  /**
+   * Give article headings stable anchors and return their EPUB navigation data.
+   * Readability preserves heading elements from sites such as Substack, but
+   * source pages do not consistently give them IDs that can be used in EPUB.
+   */
+  prepareHeadings(html) {
+    const headings = [];
+    let index = 0;
+    const body = String(html || '').replace(
+      /<h([2-6])\b([^>]*)>([\s\S]*?)<\/h\1\s*>/gi,
+      (match, level, attributes, innerHtml) => {
+        const title = this.htmlToText(innerHtml);
+        if (!title) return match;
+
+        index += 1;
+        const id = `section-${index}`;
+        headings.push({ id, title, level: Number(level) });
+
+        // Source IDs may be missing, duplicated, or unsuitable for XHTML.
+        // Replace any existing id so the NCX target is always predictable.
+        const attrsWithoutId = attributes.replace(/\s+id\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]+)/gi, '');
+        return `<h${level}${attrsWithoutId} id="${id}">${innerHtml}</h${level}>`;
+      }
+    );
+    return { body, headings };
+  },
+
+  /** Convert a heading's inline HTML into a safe plain-text NCX label. */
+  htmlToText(html) {
+    const namedEntities = {
+      amp: '&', lt: '<', gt: '>', quot: '"', apos: "'", nbsp: ' '
+    };
+    return String(html || '')
+      .replace(/<[^>]*>/g, ' ')
+      .replace(/&(#x[\da-f]+|#\d+|amp|lt|gt|quot|apos|nbsp);/gi, (entity, value) => {
+        const normalized = value.toLowerCase();
+        if (normalized.startsWith('#x')) return String.fromCodePoint(parseInt(normalized.slice(2), 16));
+        if (normalized.startsWith('#')) return String.fromCodePoint(parseInt(normalized.slice(1), 10));
+        return namedEntities[normalized];
+      })
+      .replace(/\s+/g, ' ')
+      .trim();
   },
 
   /**
@@ -126,6 +178,15 @@ ${coverItem}
       margin-bottom: 0.3em;
       line-height: 1.3;
     }
+    h2, h3, h4, h5, h6 {
+      margin-top: 1.8em;
+      margin-bottom: 0.6em;
+      line-height: 1.3;
+      font-weight: bold;
+    }
+    h2 { font-size: 1.35em; }
+    h3 { font-size: 1.2em; }
+    h4, h5, h6 { font-size: 1.05em; }
     .meta {
       color: #666;
       font-size: 0.85em;
