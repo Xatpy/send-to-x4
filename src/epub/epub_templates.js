@@ -20,10 +20,10 @@ const EpubTemplates = {
 
   /**
    * Generate content.opf
-   * @param {Object} metadata - { title, author, date, uuid, coverMediaType }
+   * @param {Object} metadata - { title, author, date, uuid, language, coverMediaType }
    */
   contentOpf(metadata) {
-    const { title, author, date, uuid, coverMediaType } = metadata;
+    const { title, author, date, uuid, language, coverMediaType } = metadata;
     const creatorLine = author
       ? `    <dc:creator>${this.escapeXml(author)}</dc:creator>`
       : '';
@@ -48,7 +48,7 @@ ${creatorLine}
 ${dateLine}
 ${coverMeta}
     <dc:identifier id="bookid">urn:uuid:${uuid}</dc:identifier>
-    <dc:language>en</dc:language>
+    <dc:language>${language ?? 'en'}</dc:language>
   </metadata>
   <manifest>
     <item id="ncx" href="toc.ncx" media-type="application/x-dtbncx+xml"/>

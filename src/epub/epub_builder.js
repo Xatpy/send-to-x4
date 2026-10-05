@@ -68,6 +68,7 @@ const EpubBuilder = {
             author: article.author,
             date: article.date,
             uuid: uuid,
+            language: article.language,
             coverMediaType
         };
 

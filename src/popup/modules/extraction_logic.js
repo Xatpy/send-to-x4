@@ -27,6 +27,7 @@ export function extractArticle() {
                 let threadContent = [];
                 let title = '';
                 let firstTweetFound = false;
+                let language = 'en';
 
                 console.log('[X4] Found tweets:', tweets.length);
 
@@ -52,6 +53,7 @@ export function extractArticle() {
                         // Extract Text
                         let textEl = tweet.querySelector('[data-testid="tweetText"]');
                         let isArticle = false;
+                        language = textEl.getAttribute('lang')
 
                         // Fallback for Twitter Articles (Long Posts)
                         if (!textEl) {
@@ -136,6 +138,7 @@ export function extractArticle() {
                             wordCount: threadContent.length * 30,
                             body: threadContent.join('\n'),
                             rawText: '',
+                            language,
                             sourceUrl: window.location.href
                         }
                     };
@@ -154,6 +157,7 @@ export function extractArticle() {
         let body = '';
         let textContent = '';
         let wordCount = 0;
+        let language = document.querySelector('html').getAttribute('lang') || null
 
         // Browser download APIs require a filesystem-safe filename. Normalize
         // common article date formats before they are incorporated into it.
@@ -214,6 +218,7 @@ export function extractArticle() {
                         wordCount,
                         body,
                         rawText: textContent,
+                        language: article.lang || language,
                         sourceUrl: window.location.href
                     }
                 };
@@ -263,6 +268,7 @@ export function extractArticle() {
                 wordCount,
                 body,
                 rawText: textContent,
+                language,
                 sourceUrl: window.location.href
             }
         };
