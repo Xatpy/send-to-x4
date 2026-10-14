@@ -7,6 +7,7 @@ export function extractArticle() {
     try {
         console.log('[X4] Extracting article...');
         const hostname = window.location.hostname;
+        const pageLanguage = document.documentElement.lang || '';
 
         // --- TWITTER / X SUPPORT ---
         if (hostname.includes('twitter.com') || hostname.includes('x.com')) {
@@ -126,6 +127,12 @@ export function extractArticle() {
                     }
                     */
 
+                    // X sets the page lang to the UI language; tweets carry their own
+                    const threadLanguage = tweets
+                        .map(tweet => tweet.querySelector('[data-testid="tweetText"][lang]'))
+                        .find(el => el && el.getAttribute('lang') !== 'und')
+                        ?.getAttribute('lang') || pageLanguage;
+
                     return {
                         success: true,
                         article: {
@@ -136,7 +143,8 @@ export function extractArticle() {
                             wordCount: threadContent.length * 30,
                             body: threadContent.join('\n'),
                             rawText: '',
-                            sourceUrl: window.location.href
+                            sourceUrl: window.location.href,
+                            language: threadLanguage
                         }
                     };
                 }
@@ -214,7 +222,8 @@ export function extractArticle() {
                         wordCount,
                         body,
                         rawText: textContent,
-                        sourceUrl: window.location.href
+                        sourceUrl: window.location.href,
+                        language: article.lang || pageLanguage
                     }
                 };
             }
@@ -263,7 +272,8 @@ export function extractArticle() {
                 wordCount,
                 body,
                 rawText: textContent,
-                sourceUrl: window.location.href
+                sourceUrl: window.location.href,
+                language: pageLanguage
             }
         };
 

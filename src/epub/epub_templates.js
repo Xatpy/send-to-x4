@@ -23,7 +23,7 @@ const EpubTemplates = {
    * @param {Object} metadata - { title, author, date, uuid, coverMediaType }
    */
   contentOpf(metadata) {
-    const { title, author, date, uuid, coverMediaType } = metadata;
+    const { title, author, date, uuid, coverMediaType, language } = metadata;
     const creatorLine = author
       ? `    <dc:creator>${this.escapeXml(author)}</dc:creator>`
       : '';
@@ -48,7 +48,7 @@ ${creatorLine}
 ${dateLine}
 ${coverMeta}
     <dc:identifier id="bookid">urn:uuid:${uuid}</dc:identifier>
-    <dc:language>en</dc:language>
+    <dc:language>${this.normalizeLanguage(language)}</dc:language>
   </metadata>
   <manifest>
     <item id="ncx" href="toc.ncx" media-type="application/x-dtbncx+xml"/>
@@ -95,7 +95,8 @@ ${coverItem}
    * @param {Object} data - { title, author, date, body, url }
    */
   contentXhtml(data) {
-    const { title, author, date, body, url } = data;
+    const { title, author, date, body, url, language } = data;
+    const lang = this.normalizeLanguage(language);
 
     // Build metadata line: @handle • date • Source: url
     const metaParts = [];
@@ -111,7 +112,7 @@ ${coverItem}
 
     return `<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.1//EN" "http://www.w3.org/TR/xhtml11/DTD/xhtml11.dtd">
-<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="${lang}" lang="${lang}">
 <head>
   <meta http-equiv="Content-Type" content="application/xhtml+xml; charset=utf-8"/>
   <title>${this.escapeXml(title)}</title>
@@ -156,6 +157,19 @@ ${coverItem}
   </div>
 </body>
 </html>`;
+  },
+
+  /**
+   * Normalize a language tag for EPUB metadata.
+   * Readers such as CrossPoint/CrossInk pick hyphenation rules from this tag,
+   * so it must reflect the article language instead of a fixed default.
+   * @param {string} language - Raw tag, e.g. "es", "es_ES" or "pt-BR"
+   * @returns {string} A BCP 47 style tag, or "en" when missing or invalid
+   */
+  normalizeLanguage(language) {
+    if (typeof language !== 'string') return 'en';
+    const tag = language.trim().replace(/_/g, '-');
+    return /^[A-Za-z]{2,3}(-[A-Za-z0-9]{1,8})*$/.test(tag) ? tag : 'en';
   },
 
   /**

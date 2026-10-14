@@ -68,7 +68,8 @@ const EpubBuilder = {
             author: article.author,
             date: article.date,
             uuid: uuid,
-            coverMediaType
+            coverMediaType,
+            language: article.language
         };
 
         // Add mimetype file (must be first and uncompressed)
